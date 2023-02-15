@@ -6,9 +6,8 @@ use PortfolioProject;
 select * from covidvaccinations;
 select * from coviddeaths;
 
-select count(*)  from covidvaccinations;
 
-select count(*)  from coviddeaths;
+-- Count of rows of two different tables 
 
 SELECT  (
         SELECT COUNT(*)
