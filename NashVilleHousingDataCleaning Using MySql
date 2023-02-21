@@ -1,1 +1,281 @@
 
+-- Cleaning Data using SQL Queries
+SELECT * FROM PortfolioProject.NashvilleHousingData;
+
+Select count(*) from NashvilleHousingData;
+
+SELECT count(*) FROM PortfolioProject.NashvilleHousingData
+where SoldAsVacant='No';
+
+SELECT count(*) FROM PortfolioProject.NashvilleHousingData
+where SoldAsVacant='Yes';
+
+/* 
+Changing datatypes of the columns
+(After importing data, columns datatypes should be correctd. TEXT datatype occupies more space.So, first step is to change data types)
+*/
+
+ALTER TABLE `PortfolioProject`.`NashvilleHousingData` 
+CHANGE COLUMN `ParcelID` `ParcelID` INT NULL DEFAULT NULL ,
+CHANGE COLUMN `LandUse` `LandUse` CHAR(200) NULL DEFAULT NULL ,
+CHANGE COLUMN `PropertyAddress` `PropertyAddress` VARCHAR(250) NULL DEFAULT NULL ,
+CHANGE COLUMN `SaleDate` `SaleDate` VARCHAR(25) NULL DEFAULT NULL ,
+CHANGE COLUMN `LegalReference` `LegalReference` INT NULL DEFAULT NULL ,
+CHANGE COLUMN `SoldAsVacant` `SoldAsVacant` VARCHAR(3) NULL DEFAULT NULL ,
+CHANGE COLUMN `OwnerName` `OwnerName` CHAR(250) NULL DEFAULT NULL ,
+CHANGE COLUMN `OwnerAddress` `OwnerAddress` VARCHAR(250) NULL DEFAULT NULL ,
+CHANGE COLUMN `TaxDistrict` `TaxDistrict` CHAR(25) NULL DEFAULT NULL ;
+
+-- Getting Standardize Date Format
+
+(SELECT SaleDate, replace(SaleDate,",","") Dat
+FROM    PortfolioProject.NashvilleHousingData);
+
+
+Select *,extract(YEAR from A.Dat )
+FROM
+(
+Select SaleDate,STR_TO_DATE( replace(SaleDate,",",""), "%M %e %Y" ) Dat
+FROM    PortfolioProject.NashvilleHousingData
+) A;
+
+
+SET SQL_SAFE_UPDATES = 0; -- Disabling safe mode
+
+-- Updating the table with the Standard Date format
+
+Update NashvilleHousingData
+SET SaleDate = STR_TO_DATE( replace(SaleDate,",",""), "%M %e %Y" )
+WHERE UniqueID>0;
+
+
+ --------------------------------------------------------------------------------------------------------------------------
+
+-- Populate Property Address data
+
+
+Select count(*)
+From PortfolioProject.NashvilleHousingData
+Where PropertyAddress=''
+order by ParcelID;
+
+SELECT * FROM PortfolioProject.NashvilleHousingData
+WHERE PropertyAddress is NULL;
+
+-- Inserting 'Null' value in table if propertyAddress is ''
+
+Select ParcelID,PropertyAddress, nullif(PropertyAddress,'')
+From PortfolioProject.NashvilleHousingData
+Where PropertyAddress='';
+
+Update NashvilleHousingData
+SET PropertyAddress = nullif(PropertyAddress,'')
+WHERE UniqueID>0;
+
+
+SELECT UniqueID,UniqueID,PropertyAddress,OwnerAddress  -- We can observe Data,that Property Address and OwnerAddress are same.
+FROM
+PortfolioProject.NashvilleHousingData;
+
+
+SELECT UniqueID,PropertyAddress,OwnerAddress,ifnull(PropertyAddress,OwnerAddress)
+FROM
+PortfolioProject.NashvilleHousingData                         -- We can set the Null values in PropertyAddress with OwnerAddress
+WHERE PropertyAddress IS NULL;
+
+
+
+
+Select a.UniqueID,a.PropertyAddress,b.UniqueID, b.ParcelID, b.PropertyAddress
+From PortfolioProject.NashvilleHousingData a
+INNER JOIN PortfolioProject.NashvilleHousingData b
+	on a.ParcelID = b.ParcelID
+	AND a.UniqueID <> b.UniqueID 
+Where a.PropertyAddress is  NULL;
+
+
+--------------------------------------------------------------------------------------------------------------------------
+
+-- Breaking out Owner Address into Individual Columns (Address, City, State)
+
+SELECT A.Address,SUBSTRING_INDEX(A.City,',',1) City,A.State
+FROM
+(SELECT SUBSTRING_INDEX(OwnerAddress,',',1) Address,
+        SUBSTRING_INDEX(OwnerAddress,',',-2) City,
+        SUBSTRING_INDEX(OwnerAddress,',',-1) State
+FROM 
+PortfolioProject.NashvilleHousingData)A;
+------------------------------------------------------------------
+
+SELECT OwnerAddress, SUBSTRING_INDEX(OwnerAddress,',',(locate(',',OwnerAddress)))
+FROM 
+PortfolioProject.NashvilleHousingData;
+
+
+SELECT OwnerAddress,locate(',',OwnerAddress,locate(',',OwnerAddress)+1)
+
+from NashvilleHousingData;
+
+
+SELECT OwnerAddress,SUBSTRING_INDEX(OwnerAddress,',',1) Address,
+        SUBSTRING(OwnerAddress,locate(',',OwnerAddress)+1,locate(',',OwnerAddress,(locate(',',OwnerAddress)-locate(',',OwnerAddress)+1))) City,
+        SUBSTRING_INDEX(OwnerAddress,',',-1) State
+FROM 
+PortfolioProject.NashvilleHousingData;
+
+SELECT OwnerAddress,SUBSTRING_INDEX(OwnerAddress,',',1) Address,
+       Replace(Replace(SUBSTRING_INDEX(OwnerAddress,',',2),SUBSTRING_INDEX(OwnerAddress,',',1),''),',',''),
+        SUBSTRING_INDEX(OwnerAddress,',',-1) State
+FROM 
+PortfolioProject.NashvilleHousingData;
+
+
+
+-- Creating 3 colums in table NashvilleHousingData 
+
+
+ALTER TABLE NashvilleHousingData
+Add OwnerSplitAddress Nvarchar(255),
+Add OwnerSplitCity Nvarchar(255),
+Add OwnerSplitState Nvarchar(255);
+
+
+Update NashvilleHousingData
+SET OwnerSplitAddress=SUBSTRING_INDEX(OwnerAddress,',',1);
+
+
+Update NashvilleHousingData
+SET OwnerSplitCity= Replace(Replace(SUBSTRING_INDEX(OwnerAddress,',',2),SUBSTRING_INDEX(OwnerAddress,',',1),''),',','');
+
+
+SET autocommit=0;
+SAVEPOINT B;
+Update NashvilleHousingData
+SET OwnerSplitState= SUBSTRING_INDEX(OwnerAddress,',',-1);
+ROLLBACK TO SAVEPOINT B;
+COMMIT;
+
+--------------------------------------------------------------------------------------------------------------------------------------
+SELECT * FROM PortfolioProject.NashvilleHousingData;
+-- Splittting Property Address
+SELECT SUBSTRING_INDEX(PropertyAddress,',',1) PropertyAddress,
+        SUBSTRING_INDEX(PropertyAddress,',',-1) PropertyCity
+FROM 
+PortfolioProject.NashvilleHousingData;
+
+Set AutoCommit=0;
+Savepoint C;
+ALTER TABLE NashvilleHousingData
+Add PropertyAddr Nvarchar(255),
+Add PropertyCity Nvarchar(255);
+
+
+Update NashvilleHousingData
+SET PropertyAddr = SUBSTRING_INDEX(PropertyAddress,',',1);
+
+Update NashvilleHousingData
+SET PropertyCity = SUBSTRING_INDEX(PropertyAddress,',',-1);
+
+RollBAck to Savepoint C;  -- Use if needed
+commit;
+
+
+--------------------------------------------------------------------------------------------------------------------------
+
+
+-- Change Y and N to Yes and No in "Sold as Vacant" field
+
+Select Distinct(SoldAsVacant), Count(SoldAsVacant)
+From PortfolioProject.NashvilleHousingData
+Group by SoldAsVacant
+order by 2;
+
+SELECT SoldAsVacant,
+    Case 
+       WHEN SoldAsVacant="Y" then "Yes"
+	   When SoldAsVacant= "N" then "No"
+	   else SoldAsVacant
+	END  As SoldVsVacant
+FROM
+NashvilleHousingData;
+
+
+Update NashvilleHousingData
+SET SoldAsVacant = CASE When SoldAsVacant = 'Y' THEN 'Yes'
+	   When SoldAsVacant = 'N' THEN 'No'
+	   ELSE SoldAsVacant
+	   END;
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- Remove Duplicates
+
+Select count(UniqueID) from NashvilleHousingData -- We see there are no duplicates in UniqueID
+group by UniqueID
+having count(1)>0;
+
+
+SELECT count(1),count(*),count(uniqueid),count(distinct trim(uniqueid)),count(TaxDistrict),count(distinct TaxDistrict) FROM NashvilleHousingData;
+SELECT count(distinct uniqueid , ParcelID, LandUse, PropertyAddress, SaleDate, SalePrice) WithoutIfnull
+-- LegalReference, SoldAsVacant, OwnerName, OwnerAddress, Acreage, TaxDistrict, 
+-- LandValue, BuildingValue, TotalValue, YearBuilt, Bedrooms, FullBath, HalfBath, OwnerSplitAddress, OwnerSplitCity, OwnerSplitState, PropertyAddr, PropertyCity) 
+FROM PortfolioProject.NashvilleHousingData;
+
+-- Ifnull should be used for the columns which has null value in it. Otherwise the query will consider the whole record as null
+
+SELECT count(distinct uniqueid , ParcelID, LandUse, ifnull(PropertyAddress,'a'), SaleDate, SalePrice) WithIfnull
+FROM PortfolioProject.NashvilleHousingData;
+
+-- Above queries using DUAL
+
+SELECT 
+(SELECT count(distinct uniqueid , ParcelID, LandUse, PropertyAddress, SaleDate, SalePrice) WithoutIfnull
+FROM
+PortfolioProject.NashvilleHousingData) AS CountWithoutIfnull,
+(
+SELECT count(distinct uniqueid , ParcelID, LandUse, ifnull(PropertyAddress,'a'), SaleDate, SalePrice) WithIfnull
+FROM 
+PortfolioProject.NashvilleHousingData
+) AS CountWithIfnull
+FROM
+DUAL;
+
+
+WITH RowNumCTE AS(
+Select *,
+	ROW_NUMBER() OVER (
+	PARTITION BY ParcelID,
+				 PropertyAddress,
+				 SalePrice,
+				 SaleDate,
+				 LegalReference
+				 ORDER BY
+					UniqueID
+					) row_num
+
+From PortfolioProject.NashvilleHousingData
+-- order by ParcelID
+)
+Select *
+From RowNumCTE
+Where row_num > 1
+Order by PropertyAddress;
+
+
+---------------------------------------------------------------------------------------------------------
+
+-- Delete Unused Columns
+
+Select *
+From PortfolioProject.NashvilleHousingData;
+
+
+ALTER TABLE PortfolioProject.NashvilleHousingData -- Data should not be deleted or Altered usually from the original file. You should make a copy and make changes.
+DROP COLUMN OwnerAddress,
+DROP COLUMN TaxDistrict, 
+DROP COLUMN PropertyAddress, 
+DROP COLUMN SaleDate;=-
+
+
+-----------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------
